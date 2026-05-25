@@ -1,2 +1,7 @@
+<<<<<<< HEAD
 Flask==3.0.3
 gunicorn==22.0.0
+=======
+Flask==3.0.3
+sympy==1.13.3
+>>>>>>> 4179de6b58d33908583dbafed361164cae52ce69
