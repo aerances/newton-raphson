@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newton-Raphson Dashboard Engine</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+    <header>
+        <h1>NumericalMethods // <span>Newton-Raphson</span></h1>
+    </header>
+
+    <div class="dashboard">
+        
+        <aside class="sidebar-theory">
+            <h2>1. Core Mechanics</h2>
+            <p>
+                The Newton-Raphson scheme locates real roots of differentiable profiles where $f(x) = 0$ by using local tangent vectors sequentially.
+            </p>
+            
+            <p><strong>Linear Taylor Setup</strong></p>
+            <p>
+                Expanding your current iteration threshold point through a localized first-order Taylor sequence assumes a small step variance $h = r - x_0$:
+            </p>
+            
+            <div class="equation-card">
+                $$0 \approx f(x_0) + h \cdot f'(x_0)$$
+            </div>
+
+            <p><strong>The Operational Recurrence</strong></p>
+            <p>
+                Isolating for adjustment factor $h$ and implementing it across endless cycles changes our target point into an active sequence generator formula:
+            </p>
+
+            <div class="equation-card">
+                $$x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}$$
+            </div>
+
+            <p><strong>Geometry Breakdown</strong></p>
+            <p>
+                Every step projects along the local function tangent point $(x_n, f(x_n))$. The zero-crossing point where this tangent line cuts cleanly across the $x$-axis sets the stage for your next point entry vector.
+            </p>
+
+            <div class="alert-panel">
+                <strong>Anomalous Convergence:</strong> Stationary regions where $f'(x_n) \to 0$ will crash the computation matrix completely or shift the vector trajectory out to infinity.
+            </div>
+        </aside>
+
+        <main class="workspace-area">
+            
+            <section>
+                <h2 class="section-title">2. Matrix Presets</h2>
+                <div class="examples-row">
+                    {% for ex in examples %}
+                    <div class="example-card">
+                        <h3>{{ ex.title }}</h3>
+                        <span class="code-badge">f(x) = {{ ex.expr }}</span>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">{{ ex.desc }}</p>
+                        <button class="btn btn-pill" onclick="loadExample('{{ ex.expr }}', '{{ ex.x0 }}')">
+                            Inject Matrix Model
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="interactive-panel" id="workspace">
+                <h2 class="section-title">3. Live Simulation Control</h2>
+                
+                <form id="calc-form">
+                    <div class="control-inputs">
+                        <div>
+                            <label for="expression">Function Equation Expression</label>
+                            <input type="text" id="expression" placeholder="e.g., x^3 - 2*x - 5" required>
+                        </div>
+                        <div>
+                            <label for="x0">Initial Vector (x₀)</label>
+                            <input type="number" id="x0" step="any" placeholder="2.0" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Execute Numerical Iteration</button>
+                </form>
+
+                <div id="error-message" class="error-banner hidden"></div>
+
+                <div id="results-wrapper" class="hidden">
+                    <div class="meta-output">
+                        <p>Target Profile: <span id="parsed-fx"></span></p>
+                        <p>Differential Matrix: <span id="parsed-dfx"></span></p>
+                    </div>
+
+                    <div class="table-scroller">
+                        <table id="iterations-table">
+                            <thead>
+                                <tr>
+                                    <th>Step (n)</th>
+                                    <th>x_n</th>
+                                    <th>f(x_n)</th>
+                                    <th>f'(x_n)</th>
+                                    <th>Trajectory Target x_n+1</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        function loadExample(expr, x0) {
+            document.getElementById('expression').value = expr;
+            document.getElementById('x0').value = x0;
+            document.getElementById('workspace').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('calc-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const expr = document.getElementById('expression').value;
+            const x0 = document.getElementById('x0').value;
+            const errBox = document.getElementById('error-message');
+            const resWrapper = document.getElementById('results-wrapper');
+            const tableBody = document.querySelector('#iterations-table tbody');
+
+            errBox.classList.add('hidden');
+            resWrapper.classList.add('hidden');
+            tableBody.innerHTML = '';
+
+            try {
+                const response = await fetch('/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expression: expr, x0: x0 })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || "Simulation evaluation failed.");
+
+                document.getElementById('parsed-fx').textContent = data.expression;
+                document.getElementById('parsed-dfx').textContent = data.derivative;
+
+                data.iterations.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.step}</td>
+                        <td>${row.xn}</td>
+                        <td>${row.fxn}</td>
+                        <td>${row.dfxn}</td>
+                        <td class="target-glow">${row.next_x}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+
+                resWrapper.classList.remove('hidden');
+                
+                if (window.MathJax && window.MathJax.typeset) {
+                    window.MathJax.typeset();
+                }
+
+            } catch (err) {
+                errBox.textContent = err.message;
+                errBox.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
